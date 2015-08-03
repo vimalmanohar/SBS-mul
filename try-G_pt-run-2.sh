@@ -13,13 +13,13 @@ that you run the commands one by one by copying and pasting into the shell."
 . path.sh || { echo "Cannot source path.sh"; exit 1; }
 
 # Set the location of the SBS speech 
-SBS_CORPUS=/export/ws15-pt-data/data/audio
-SBS_TRANSCRIPTS=/export/ws15-pt-data/data/transcripts/matched
-SBS_DATA_LISTS=/export/ws15-pt-data/data/lists
+SBS_CORPUS=/home/vmanoha1/workspace_ws15/data/audio
+SBS_TRANSCRIPTS=/home/vmanoha1/workspace_ws15/data/transcripts/matched
+SBS_DATA_LISTS=/home/vmanoha1/workspace_ws15/data/lists
 
 # Set the language codes for SBS languages that we will be processing
 #export SBS_LANGUAGES="AR DT MD HG SW UR"
-export SBS_LANGUAGES="MD"
+export SBS_LANGUAGES="SW"
 
 :<<'END'
 #### LANGUAGE SPECIFIC SCRIPTS HERE ####
@@ -201,15 +201,13 @@ END
   echo ------------------------------------------
 END
 
-:<<'END'
   # align pt of target language
-  mkdir -p exp/tri3b_ali_${L}_train_pt-2
+  mkdir -p exp/tri3b_ali_${L}_train_pt
 	#steps/align_fmllr_post.sh --nj 8 --cmd "$train_cmd" \
-	steps/align_fmllr_post.sh --stage 3 --nj 8 --cmd "$train_cmd" \
-		data/$L/train data/lang exp/tri3b_2 exp/tri3b_ali_${L}_train_pt-2 \
+	local/align_fmllr_post.sh --nj 8 --cmd "$train_cmd" \
+		data/$L/train data/lang exp/tri3b exp/tri3b_ali_${L}_train_pt \
     || exit 1;
   echo ------------------------------------------
-END
 
 :<<'END'
   # align dt of target language
@@ -227,9 +225,9 @@ END
 	#steps/train_sat_extra.sh --cmd "$train_cmd" 2500 15000 \
 	#steps/train_sat_extra_post_test_1.sh --cmd "$train_cmd" 2500 15000 \
 	#steps/train_sat_extra_post.sh --cmd "$train_cmd" 2500 15000 \
-	steps/train_sat_extra_post.sh --cmd "$train_cmd" 1200 8000 \
-		data/train data/$L/train data/lang exp/tri3b_2_ali \
-    exp/tri3b_ali_${L}_train_pt-2 exp/tri3b_extra_${L}_train_pt-2 || exit 1;
+	local/train_sat_extra_post.sh --cmd "$train_cmd" 1200 8000 \
+		data/train data/$L/train data/lang exp/tri3b_ali \
+    exp/tri3b_ali_${L}_train_pt exp/tri3b_extra_${L}_train_pt || exit 1;
     #exp/tri3b_ali_train_post exp/tri3b_extra_train || exit 1;
   echo ------------------------------------------
 

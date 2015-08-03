@@ -109,11 +109,7 @@ else
     #  compile-train-graphs $dir/tree $dir/final.mdl  $lang/L.fst "$tra" \
     #    "ark:|gzip -c >$dir/fsts.JOB.gz" || exit 1;
 
-    #dir_fsts="/export/ws15-pt-data/cliu/data/phonelattices/monophones/engg2p/mandarin-no_epsilon_1/"
-    #dir_fsts="/export/ws15-pt-data/cliu/data/phonelattices/monophones/engg2p/mandarin-no_epsilon_1-sym_fixed/"
-    #dir_fsts="/export/ws15-pt-data/cliu/data/phonelattices/monophones/engg2p/mandarin-no_epsilon_1-phn164/"
-    #dir_fsts="/export/ws15-pt-data/cliu/data/phonelattices/monophones/engg2p/mandarin_epsilon_2-sym_fixed/"
-    dir_fsts="/export/ws15-pt-data/cliu/data/phonelattices/monophones/trainedp2let/HG_SW_UR_DT_AR_MDdecode-rmeps/"
+    dir_fsts="/home/vmanoha1/workspace_ws15/data/phonelattices/monophones/trainedp2let/HG_MD_UR_DT_AR_SWdecode/"
     $cmd JOB=1:$nj $dir/log/text_pt.JOB.log \
       cut -f1 "$sdata/JOB/text" \| awk -v dir_fsts=$dir_fsts \
       '{key=value=$1; value=value".lat.fst"; print key"\t"dir_fsts""value}' \
