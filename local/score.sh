@@ -97,7 +97,7 @@ if [ $stage -le 0 ]; then
     $cmd LMWT=$min_lmwt:$max_lmwt $dir/scoring_kaldi/penalty_$wip/log/score.LMWT.log \
       cat $dir/scoring_kaldi/penalty_$wip/LMWT.txt \| \
       compute-wer --text --mode=present \
-      ark:$dir/scoring_kaldi/test_filt.txt  ark,p:- ">&" $dir/wer_LMWT_$wip || exit 1;
+      ark:$dir/scoring_kaldi/test_filt.txt ark,p:- - \| sort \| uniq -c ">&" $dir/wer_LMWT_$wip || exit 1;
 
   done
 fi
