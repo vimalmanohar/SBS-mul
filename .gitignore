@@ -1,4 +1,8 @@
+/*.log 
 data
 exp
 steps
 utils
+mfcc*
+err*.log
+out*.log
