@@ -6,6 +6,10 @@
 . cmd.sh
 mfccdir=mfcc
 
+set -e
+set -o pipefail
+set -u
+
 stage=1
 
 . cmd.sh
@@ -38,7 +42,7 @@ if [ $stage -le 3 ]; then
   steps/train_lda_mllt.sh --cmd "$train_cmd" --num-iters 13 \
     --realign-iters "" \
     --splice-opts "--left-context=3 --right-context=3" \
-    1200 8000 data/train data/lang \
+    1200 8000 data/train_hires data/lang \
      exp/nnet2_online/tri3b_ali exp/nnet2_online/tri4b
 fi
 
