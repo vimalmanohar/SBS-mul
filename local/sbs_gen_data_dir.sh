@@ -15,7 +15,7 @@ find $DATA -name "*.wav" > data/local/$dir/wav.scp
 for x in `cat data/local/$dir/wav.scp`; do
   y=`basename $x`
   z=${y%*.wav}
-  echo $z $y
+  echo $z $x
 done > $dir/wav.scp
 
 awk '{print $1" "$1}' $dir/wav.scp > $dir/utt2spk
