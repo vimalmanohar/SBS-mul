@@ -132,13 +132,16 @@ for x in train dev eval; do
             sed 's:wav:txt:g' $LISTDIR/${full_name}/${x}.txt | sed "s:^:${TRANSDIR}/${full_name}/:" | LC_ALL=en_US.UTF-8 xargs local/MD_seg.py conf/${full_name}/callhome-dict | LC_ALL=en_US.UTF-8 local/uniphone.py > $tmpdir/${LCODE}_${x}.trans
             ;;
         HG)
-            python local/sbs_create_phntrans_HG.py --g2p conf/${full_name}/g2pmap.txt --utts $tmpdir/downsample/${x}_basenames_wav --transdir "$TRANSDIR/${full_name}" | LC_ALL=en_US.UTF-8 local/uniphone.py | sed 's/sil//g' | sed 's/   */ /g' | sed 's/^ *//g' | sed 's/ *$//g'> $tmpdir/${LCODE}_${x}.trans 
+            local/sbs_create_phntrans_HG.py --g2p conf/${full_name}/g2pmap.txt --utts $tmpdir/downsample/${x}_basenames_wav --transdir "$TRANSDIR/${full_name}" | LC_ALL=en_US.UTF-8 local/uniphone.py | sed 's/sil//g' | sed 's/   */ /g' | sed 's/^ *//g' | sed 's/ *$//g'> $tmpdir/${LCODE}_${x}.trans 
             ;;
         SW)
-            ./local/sbs_create_phntrans_SW.pl --g2p conf/${full_name}/g2pmap.txt --utts $tmpdir/downsample/${x}_basenames_wav --transdir $tmpdir/trans --wordlist conf/${full_name}/wordlist.txt | LC_ALL=en_US.UTF-8 local/uniphone.py > $tmpdir/${LCODE}_${x}.trans
+            local/sbs_create_phntrans_SW.pl --g2p conf/${full_name}/g2pmap.txt --utts $tmpdir/downsample/${x}_basenames_wav --transdir $tmpdir/trans --wordlist conf/${full_name}/wordlist.txt | LC_ALL=en_US.UTF-8 local/uniphone.py > $tmpdir/${LCODE}_${x}.trans
             ;;
         UR)
-            ./local/sbs_create_phntrans_UR.sh $tmpdir/downsample/${x}_basenames_wav conf/${full_name}/g2pmap.txt $TRANSDIR/${full_name} | LC_ALL=en_US.UTF-8 local/uniphone.py | sed 's/eps//g' | sed 's/   */ /g' | sed 's/^ *//g' | sed 's/ *$//g' > $tmpdir/${LCODE}_${x}.trans
+            local/sbs_create_phntrans_UR.sh $tmpdir/downsample/${x}_basenames_wav conf/${full_name}/g2pmap.txt $TRANSDIR/${full_name} | LC_ALL=en_US.UTF-8 local/uniphone.py | sed 's/eps//g' | sed 's/   */ /g' | sed 's/^ *//g' | sed 's/ *$//g' > $tmpdir/${LCODE}_${x}.trans
+            ;;
+        CA)
+            local/sbs_create_phntrans_CA.py --utts $tmpdir/downsample/${x}_basenames_wav --transdir "$TRANSDIR/${full_name}" > $tmpdir/${LCODE}_${x}.trans
             ;;
         *) 
             echo "Unknown language code $LCODE." && exit 1

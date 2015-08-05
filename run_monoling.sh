@@ -20,7 +20,7 @@ NUMLEAVES=1200
 NUMGAUSSIANS=8000
 
 # Set the language codes for SBS languages that we will be processing
-export SBS_LANGUAGES="SW AR UR DT HG MD"
+export SBS_LANGUAGES="AR DT HG MD SW UR"
 
 #### LANGUAGE SPECIFIC SCRIPTS HERE ####
 local/sbs_data_prep.sh --config-dir=$PWD/conf --corpus-dir=$SBS_CORPUS \

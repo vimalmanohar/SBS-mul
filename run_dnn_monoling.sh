@@ -24,11 +24,11 @@ feats_nj=4
 train_nj=8
 decode_nj=4
 
-SBS_LANG="MD SW AR DT HG UR"
+lang=$1
 
 # Config:
-gmmdir=exp/tri3b
-data_fmllr=data-fmllr-tri3b
+gmmdir=exp/$lang/tri3b
+data_fmllr=data-fmllr-tri3b_$lang
 stage=0 # resume training with --stage=N
 # End of config.
 
@@ -37,33 +37,31 @@ stage=0 # resume training with --stage=N
 echo ==========================
 if [ $stage -le 0 ]; then
 steps/align_fmllr.sh --nj "$train_nj" --cmd "$train_cmd" \
-  data/train data/lang exp/tri3b exp/tri3b_ali
+  data/$lang/train data/$lang/lang exp/$lang/tri3b exp/$lang/tri3b_ali
 fi
 echo ==========================
 
 if [ $stage -le 0 ]; then
   # Store fMLLR features, so we can train on them easily,
   # test
-  for lang in $SBS_LANG; do
-    dir=$data_fmllr/dev_$lang
-    steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
-       --transform-dir $gmmdir/decode_dev_$lang \
-       $dir data/$lang/dev $gmmdir $dir/log $dir/data &
-  done
-  wait
+  dir=$data_fmllr/dev
+  steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
+     --transform-dir $gmmdir/decode_dev \
+     $dir data/$lang/dev $gmmdir $dir/log $dir/data
 
   # train
   dir=$data_fmllr/train
   steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
      --transform-dir ${gmmdir}_ali \
-     $dir data/train $gmmdir $dir/log $dir/data
+     $dir data/$lang/train $gmmdir $dir/log $dir/data
+
   # split the data : 90% train 10% cross-validation (held-out)
   utils/subset_data_dir_tr_cv.sh $dir ${dir}_tr90 ${dir}_cv10
 fi
 
 if [ $stage -le 1 ]; then
   # Pre-train DBN, i.e. a stack of RBMs (small database, smaller DNN)
-  dir=exp/dnn4_pretrain-dbn
+  dir=exp/dnn4_pretrain-dbn_$lang
   # (tail --pid=$$ -F $dir/log/pretrain_dbn.log 2>/dev/null)& # forward log
 
   $cuda_cmd $dir/log/pretrain_dbn.log \
@@ -72,23 +70,20 @@ fi
 
 if [ $stage -le 2 ]; then
   # Train the DNN optimizing per-frame cross-entropy.
-  dir=exp/dnn4_pretrain-dbn_dnn
+  dir=exp/dnn4_pretrain-dbn_dnn_$lang
   ali=${gmmdir}_ali
   feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
-  dbn=exp/dnn4_pretrain-dbn/6.dbn
+  dbn=exp/dnn4_pretrain-dbn_$lang/6.dbn
   # (tail --pid=$$ -F $dir/log/train_nnet.log 2>/dev/null)& # forward log
 
   # Train
   $cuda_cmd $dir/log/train_nnet.log \
     steps/nnet/train.sh --feature-transform $feature_transform --dbn $dbn --hid-layers 0 --learn-rate 0.008 \
-    $data_fmllr/train_tr90 $data_fmllr/train_cv10 data/lang $ali $ali $dir
+    $data_fmllr/train_tr90 $data_fmllr/train_cv10 data/$lang/lang $ali $ali $dir
 
   # Decode (reuse HCLG graph)
-  for lang in $SBS_LANG; do
-    steps/nnet/decode.sh --nj $decode_nj --cmd "$decode_cmd" --acwt 0.2 \
-      $gmmdir/graph $data_fmllr/dev_$lang $dir/decode_dev_$lang &
-  done
-  wait
+  steps/nnet/decode.sh --nj $decode_nj --cmd "$decode_cmd" --acwt 0.2 \
+    $gmmdir/graph $data_fmllr/dev $dir/decode_dev
 fi
 
 # # Sequence training using sMBR criterion, we do Stochastic-GD 
