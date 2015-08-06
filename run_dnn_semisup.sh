@@ -5,6 +5,9 @@
 
 . ./path.sh ## Source the tools/utils (import the queue.pl)
 
+# Set the location of the SBS speech
+SBS_CORPUS=/export/ws15-pt-data/data/audio
+
 feats_nj=40
 train_nj=10
 decode_nj=5
@@ -13,21 +16,32 @@ parallel_opts="--num-threads 6"
 LANG="SW"
 
 # Config:
+acwt=0.2
 gmmdir=exp/tri3b
 data_fmllr=data-fmllr-tri3b
-stage=0 # resume training with --stage=N
+dnndir=exp/dnn4_pretrain-dbn_dnn
+stage=-100 # resume training with --stage=N
 # End of config.
+
+set -o pipefail
+set -e
+set -u 
 
 . utils/parse_options.sh
 
 L=$LANG
+
+if [ $stage -le -4 ]; then
+  local/sbs_gen_data_dir.sh --corpus-dir=$SBS_CORPUS \
+    --lang-map=conf/lang_codes.txt $LANG
+fi
 
 if [ $stage -le -3 ]; then
   mfccdir=mfcc/$L
   steps/make_mfcc.sh --nj $feats_nj --cmd "$train_cmd" data/$L/unsup exp/$L/make_mfcc/unsup $mfccdir
 
   utils/subset_data_dir.sh 4000 data/$L/unsup data/$L/unsup_4k
-  steps/compute_cmvn_stat.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir
+  steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir
 fi
 
 graph_dir=$gmmdir/graph
