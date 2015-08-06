@@ -9,7 +9,7 @@
 SBS_CORPUS=/export/ws15-pt-data/data/audio
 
 feats_nj=40
-train_nj=10
+train_nj=20
 decode_nj=5
 parallel_opts="--num-threads 6"
 
@@ -20,7 +20,9 @@ acwt=0.2
 gmmdir=exp/tri3b
 data_fmllr=data-fmllr-tri3b
 dnndir=exp/dnn4_pretrain-dbn_dnn
+dir=exp/dnn5_pretrain-dbn_dnn_semisup
 stage=-100 # resume training with --stage=N
+graph_dir=exp/tri3b/graph
 # End of config.
 
 set -o pipefail
@@ -40,26 +42,26 @@ if [ $stage -le -3 ]; then
   mfccdir=mfcc/$L
   steps/make_mfcc.sh --nj $feats_nj --cmd "$train_cmd" data/$L/unsup exp/$L/make_mfcc/unsup $mfccdir
 
-  utils/subset_data_dir.sh 4000 data/$L/unsup data/$L/unsup_4k
+  utils/subset_data_dir.sh data/$L/unsup 4000 data/$L/unsup_4k
   steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir
 fi
 
-graph_dir=$gmmdir/graph
 if [ $stage -le -2 ]; then
   steps/decode_fmllr.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
+    --skip-scoring true --acwt $acwt \
     $graph_dir data/$L/unsup_4k $gmmdir/decode_unsup_4k_$L
 fi
 
 if [ $stage -le -1 ]; then
   featdir=$data_fmllr/unsup_4k_$L
-  steps/nnet/make_fmllr_feat.sh --nj $feats_nj --cmd "$train_cmd" \
+  steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
     --transform-dir $gmmdir/decode_unsup_4k_$L \
     $featdir data/$L/unsup_4k $gmmdir $featdir/log $featdir/data 
 fi
 
 if [ $stage -le 0 ]; then
-  steps/nnet/decode.sh --nj $train_nj --cmd "$decode_cmd" \
-    --acwt $acwt \
+  steps/nnet/decode.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
+    --acwt $acwt --skip-scoring true \
     $graph_dir $data_fmllr/unsup_4k_$L $dnndir/decode_unsup_4k_$L
 fi
 
@@ -80,7 +82,7 @@ if [ $stage -le 2 ]; then
   done > $postdir/train_post.scp
 
   for n in `seq $nj`; do
-    gunzip -c $gmmdir/ali.$n.gz
+    copy-vector "ark:gunzip -c $gmmdir/ali.$n.gz |" ark,t:- 
   done | \
     awk '{printf $1" ["; for (i=2; i<=NF; i++) { printf " "1; }; print " ]";}' | \
     copy-vector ark,t:- ark,scp:$postdir/train_frame_weights.ark,$postdir/train_frame_weights.scp || exit 1
@@ -127,7 +129,6 @@ fi
 
 feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
 dbn=exp/dnn4_pretrain-dbn/6.dbn
-dir=exp/dnn5_semisup
 
 if [ $stage -le 5 ]; then
   utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/$L/train_tr90_${num_copies}x $data_fmllr/$L/unsup_4k 
