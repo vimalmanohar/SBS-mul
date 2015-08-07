@@ -12,6 +12,7 @@ feats_nj=40
 train_nj=20
 decode_nj=5
 parallel_opts="--num-threads 6"
+num_copies=3
 
 LANG="SW"
 
@@ -65,14 +66,10 @@ if [ $stage -le 0 ]; then
     $graph_dir $data_fmllr/unsup_4k_$L $dnndir/decode_unsup_4k_$L
 fi
 
-if [ $stage -le 1 ]; then
-  L=$LANG
-  local/best_path_weights.sh data/$L/unsup_4k $graph_dir \
-    $dnndir/decode_unsup_4k_$L $dnndir/best_path_unsup_4k_$L
-fi
+best_path_dir=$dnndir/best_path_unsup_4k_$L
 
 postdir=$dir/post_semisup_4k
-if [ $stage -le 2 ]; then
+if [ $stage -le 1 ]; then
   nj=$(cat $gmmdir/num_jobs)
   $train_cmd JOB=1:$nj $postdir/get_train_post.JOB.log \
     ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $gmmdir/ali.JOB.gz |" ark:- \| \
@@ -82,33 +79,20 @@ if [ $stage -le 2 ]; then
   done > $postdir/train_post.scp
 
   for n in `seq $nj`; do
-    copy-vector "ark:gunzip -c $gmmdir/ali.$n.gz |" ark,t:- 
+    copy-int-vector "ark:gunzip -c $gmmdir/ali.$n.gz |" ark,t:- 
   done | \
     awk '{printf $1" ["; for (i=2; i<=NF; i++) { printf " "1; }; print " ]";}' | \
     copy-vector ark,t:- ark,scp:$postdir/train_frame_weights.ark,$postdir/train_frame_weights.scp || exit 1
 fi
 
-if [ $stage -le 3 ]; then
-  awk -v num_copies=$num_copies \
-    '{for (i=0; i<num_copies; i++) { print i"-"$1" "$2 } }' \
-    $postdir/train_post.scp > $postdir/train_post_${num_copies}x.scp
-  
-  awk -v num_copies=$num_copies \
-    '{for (i=0; i<num_copies; i++) { print i"-"$1" "$2 } }' \
-    $postdir/train_frame_weights.scp > $postdir/train_frame_weights_${num_copies}x.scp
-
-  copied_data_dirs=
-  for i in `seq 0 $[num_copies-1]`; do
-    utils/copy_data_dir.sh --utt-prefix ${i}- $data_fmllr/train_tr90 \
-      $data_fmllr/train_tr90_$i
-    copied_data_dirs="$copied_data_dirs $data_fmllr/train_tr90_$i"
-  done
-
-  utils/combine_data_dir.sh $data_fmllr/train_90_${num_copies}x $copied_data_dirs
-  rm -rf $copied_data_dirs
+if [ $stage -le 2 ]; then
+  L=$LANG
+  local/best_path_weights.sh data/$L/unsup_4k $graph_dir \
+    $dnndir/decode_unsup_4k_$L $dnndir/best_path_unsup_4k_$L
 fi
 
-if [ $stage -le 4 ]; then
+
+if [ $stage -le 3 ]; then
   nj=$(cat $best_path_dir/num_jobs)
   $train_cmd JOB=1:$nj $postdir/get_unsup_post.JOB.log \
     ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $best_path_dir/ali.JOB.gz |" ark:- \| \
@@ -127,18 +111,41 @@ if [ $stage -le 4 ]; then
   done > $postdir/unsup_frame_weights.scp
 fi
 
+if [ $stage -le 4 ]; then
+  awk -v num_copies=$num_copies \
+    '{for (i=0; i<num_copies; i++) { print i"-"$1" "$2 } }' \
+    $postdir/train_post.scp > $postdir/train_post_${num_copies}x.scp
+  
+  awk -v num_copies=$num_copies \
+    '{for (i=0; i<num_copies; i++) { print i"-"$1" "$2 } }' \
+    $postdir/train_frame_weights.scp > $postdir/train_frame_weights_${num_copies}x.scp
+
+  copied_data_dirs=
+  for i in `seq 0 $[num_copies-1]`; do
+    utils/copy_data_dir.sh --utt-prefix ${i}- --spk-prefix ${i}- $data_fmllr/train_tr90 \
+      $data_fmllr/train_tr90_$i
+    copied_data_dirs="$copied_data_dirs $data_fmllr/train_tr90_$i"
+  done
+
+  utils/combine_data.sh $data_fmllr/train_tr90_${num_copies}x $copied_data_dirs
+fi
+
 feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
 dbn=exp/dnn4_pretrain-dbn/6.dbn
 
 if [ $stage -le 5 ]; then
-  utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/$L/train_tr90_${num_copies}x $data_fmllr/$L/unsup_4k 
+  utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/unsup_4k_$L $data_fmllr/train_tr90_${num_copies}x 
+  utils/copy_data_dir.sh --utt-prefix 0- --spk-prefix 0- $data_fmllr/train_cv10 \
+    $data_fmllr/train_cv10_0
   
   sort -k1,1 $postdir/unsup_post.scp $postdir/train_post_${num_copies}x.scp > $dir/all_post.scp
-  sort -k1,1 $postdir/unsup_frame_weights.scp $postdir/train_frame_weights.scp > $dir/all_frame_weights.scp
+  sort -k1,1 $postdir/unsup_frame_weights.scp $postdir/train_frame_weights_${num_copies}x.scp > $dir/all_frame_weights.scp
 
-  steps/nnet/train.sh --feature-transform $feature_transform --dbn $dbn \
-    --hid-layers 0 --learn-rate 0.008 \
-    --labels scp:$dir/all_post.scp --frame-weights scp:all_frame_weights.scp \
-    $dir/data_semisup_4k_${num_copies}x $data_fmllr/MD/train_cv10 \
+  num_tgt=$(hmm-info --print-args=false $gmmdir/final.mdl | grep pdfs | awk '{ print $NF }')
+  $cuda_cmd $dir/log/train.log \
+    steps/nnet/train.sh --feature-transform $feature_transform --dbn $dbn \
+    --hid-layers 0 --learn-rate 0.008 --num-tgt $num_tgt \
+    --labels scp:$dir/all_post.scp --frame-weights scp:$dir/all_frame_weights.scp \
+    $dir/data_semisup_4k_${num_copies}x $data_fmllr/train_cv10_0 \
     data/$L/lang dummy dummy $dir || exit 1;
 fi

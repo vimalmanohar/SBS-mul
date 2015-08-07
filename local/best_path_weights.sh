@@ -61,6 +61,7 @@ shift 2;
 decode_dirs=( $@ )  # read the remaining arguments into an array
 unset decode_dirs[${#decode_dirs[@]}-1]  # 'pop' the last argument which is odir
 num_sys=${#decode_dirs[@]}  # number of systems to combine
+write_ali_dir=true
 
 mkdir -p $dir
 mkdir -p $dir/log
@@ -68,7 +69,11 @@ mkdir -p $dir/log
 decode_dir=`echo ${decode_dirs[0]} | cut -d: -f1`
 nj=`cat $decode_dir/num_jobs`
 
-out_decode=$dir/`basename $decode_dir`
+if $write_ali_dir; then
+  out_decode=$dir
+else
+  out_decode=$dir/`basename $decode_dir`
+fi
 mkdir -p $out_decode
 
 if [ $stage -lt -1 ]; then
@@ -76,7 +81,7 @@ if [ $stage -lt -1 ]; then
   $cmd JOB=1:$nj $out_decode/log/best_path.JOB.log \
     lattice-best-path --acoustic-scale=0.1 \
     "ark,s,cs:gunzip -c $decode_dir/lat.JOB.gz |" \
-    ark:/dev/null "ark:| gzip -c > $out_decode/best_path_ali.JOB.gz" || exit 1
+    ark:/dev/null "ark:| gzip -c > $out_decode/ali.JOB.gz" || exit 1
 fi
 
 weights_sum=0.0
@@ -124,7 +129,7 @@ for i in `seq 0 $[num_sys-1]`; do
       lattice-to-post --acoustic-scale=0.1 \
       "ark,s,cs:gunzip -c $decode_dir/lat.JOB.gz|" ark:- \| \
       post-to-pdf-post $model ark,s,cs:- ark:- \| \
-      get-post-on-ali ark,s,cs:- "ark,s,cs:gunzip -c $out_decode/best_path_ali.JOB.gz | convert-ali $dir/final.mdl $model $tree ark,s,cs:- ark:- | ali-to-pdf $model ark,s,cs:- ark:- |" "ark:| gzip -c > $out_decode/weights.$i.JOB.gz" || exit 1
+      get-post-on-ali ark,s,cs:- "ark,s,cs:gunzip -c $out_decode/ali.JOB.gz | convert-ali $dir/final.mdl $model $tree ark,s,cs:- ark:- | ali-to-pdf $model ark,s,cs:- ark:- |" "ark:| gzip -c > $out_decode/weights.$i.JOB.gz" || exit 1
   fi
 done
 
