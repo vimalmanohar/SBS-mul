@@ -13,6 +13,7 @@ train_nj=20
 decode_nj=5
 parallel_opts="--num-threads 6"
 num_copies=3
+threshold=0.7
 
 LANG="SW"
 
@@ -47,29 +48,39 @@ if [ $stage -le -3 ]; then
   steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir
 fi
 
+graph_affix=${graph_dir#*graph}
+
 if [ $stage -le -2 ]; then
   steps/decode_fmllr.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --skip-scoring true --acwt $acwt \
-    $graph_dir data/$L/unsup_4k $gmmdir/decode_unsup_4k_$L
+    $graph_dir data/$L/unsup_4k $gmmdir/decode${graph_affix}_unsup_4k_$L
 fi
 
 if [ $stage -le -1 ]; then
   featdir=$data_fmllr/unsup_4k_$L
   steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
-    --transform-dir $gmmdir/decode_unsup_4k_$L \
+    --transform-dir $gmmdir/decode${graph_affix}_unsup_4k_$L \
     $featdir data/$L/unsup_4k $gmmdir $featdir/log $featdir/data 
 fi
 
 if [ $stage -le 0 ]; then
   steps/nnet/decode.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --acwt $acwt --skip-scoring true \
-    $graph_dir $data_fmllr/unsup_4k_$L $dnndir/decode_unsup_4k_$L
+    $graph_dir $data_fmllr/unsup_4k_$L $dnndir/decode${graph_affix}_unsup_4k_$L
 fi
 
 best_path_dir=$dnndir/best_path_unsup_4k_$L
 
-postdir=$dir/post_semisup_4k
+postdir=$dnndir/post_semisup_4k${threshold:-_$threshold}
+
 if [ $stage -le 1 ]; then
+  L=$LANG
+  local/best_path_weights.sh data/$L/unsup_4k $graph_dir \
+    $dnndir/decode${graph_affix}_unsup_4k_$L $dnndir/best_path${graph_affix}_unsup_4k_$L
+fi
+
+
+if [ $stage -le 2 ]; then
   nj=$(cat $gmmdir/num_jobs)
   $train_cmd JOB=1:$nj $postdir/get_train_post.JOB.log \
     ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $gmmdir/ali.JOB.gz |" ark:- \| \
@@ -85,13 +96,6 @@ if [ $stage -le 1 ]; then
     copy-vector ark,t:- ark,scp:$postdir/train_frame_weights.ark,$postdir/train_frame_weights.scp || exit 1
 fi
 
-if [ $stage -le 2 ]; then
-  L=$LANG
-  local/best_path_weights.sh data/$L/unsup_4k $graph_dir \
-    $dnndir/decode_unsup_4k_$L $dnndir/best_path_unsup_4k_$L
-fi
-
-
 if [ $stage -le 3 ]; then
   nj=$(cat $best_path_dir/num_jobs)
   $train_cmd JOB=1:$nj $postdir/get_unsup_post.JOB.log \
@@ -102,8 +106,13 @@ if [ $stage -le 3 ]; then
     cat $postdir/unsup_post.$n.scp
   done > $postdir/unsup_post.scp
 
+  copy_command=copy-vector
+  if [ ! -z "$threshold" ]; then
+    copy_command="thresh-vector --threshold=$threshold --lower-cap=0.0 --upper-cap=1.0"
+  fi
+
   $train_cmd JOB=1:$nj $postdir/copy_frame_weights.JOB.log \
-    copy-vector "ark:gunzip -c $best_path_dir/weights.JOB.gz |" \
+    $copy_command "ark:gunzip -c $best_path_dir/weights.JOB.gz |" \
     ark,scp:$postdir/unsup_frame_weights.JOB.ark,$postdir/unsup_frame_weights.JOB.scp || exit 1
   
   for n in `seq $nj`; do
@@ -148,4 +157,17 @@ if [ $stage -le 5 ]; then
     --labels scp:$dir/all_post.scp --frame-weights scp:$dir/all_frame_weights.scp \
     $dir/data_semisup_4k_${num_copies}x $data_fmllr/train_cv10_0 \
     data/$L/lang dummy dummy $dir || exit 1;
+fi
+
+if [ $stage -le 6 ]; then
+  steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/MD/train $dir
+  cp $dnndir/final.mdl $dir
+fi
+
+if [ $stage -le 7 ]; then
+  # Decode (reuse HCLG graph)
+  for lang in $L; do
+    steps/nnet/decode.sh $parallel_opts --nj $decode_nj --cmd "$decode_cmd" --acwt $acwt \
+      $graph_dir $data_fmllr/eval_$lang $dir/decode${graph_affix}_eval_$lang || exit 1
+  done
 fi
