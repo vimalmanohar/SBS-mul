@@ -94,8 +94,8 @@ srcdir=data/local/data
 printf "preparing pronunciation lexicon ... "
 mkdir -p data/local/dict
 phones=$config_dir/phones.txt
-cut -f2- $srcdir/train_text | tr ' ' '\n' | sort -u > $phones
-# awk '{print $1}' conf/univphones.txt | grep -v '#0' | grep -v '<eps>' > $phones
+# cut -f2- $srcdir/train_text | tr ' ' '\n' | sort -u > $phones
+awk '{print $1}' conf/univphones.txt | grep -v '#0' | grep -v '<eps>' > $phones
 
 awk '{print $1"\t"$1}' $phones > data/local/dict/lexicon_nosil.txt
 

@@ -54,6 +54,8 @@ fstprint --isymbols=data/lang_test/phones.txt --osymbols=data/lang_test/words.tx
   > $test/L_disambig.fst
 
 cat /export/ws15-pt-data/data/text-phnlm/${LCODE}/bigram.lm | \
+  sed 's/\tg/\tɡ/g' | sed 's/ g/ ɡ/g' | \
+  sed 's/sil/!SIL/g' | \
   egrep -v '<s> <s>|</s> <s>|</s> </s>' | \
   arpa2fst - | fstprint | \
   utils/eps2disambig.pl | utils/s2eps.pl | fstcompile --isymbols=$test/words.txt \

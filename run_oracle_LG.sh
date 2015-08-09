@@ -9,7 +9,7 @@ set -e
 . ./cmd.sh
 . ./path.sh
 
-SBS_LANGUAGES="AR DT HG MD SW UR"
+SBS_LANGUAGES="AR CA DT HG MD SW UR"
 
 for L in $SBS_LANGUAGES; do
   echo "Prep oracle G for $L"

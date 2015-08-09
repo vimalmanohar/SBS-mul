@@ -20,8 +20,8 @@ NUMLEAVES=1200
 NUMGAUSSIANS=8000
 
 # Set the language codes for SBS languages that we will be processing
-export SBS_LANGUAGES="SW AR UR DT HG MD"
-export TRAIN_LANG="AR UR DT HG MD"
+export SBS_LANGUAGES="AR CA DT HG MD SW UR"
+export TRAIN_LANG="AR CA DT HG MD UR"
 export TEST_LANG="SW"
 
 #### LANGUAGE SPECIFIC SCRIPTS HERE ####

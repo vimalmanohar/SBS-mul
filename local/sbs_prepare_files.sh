@@ -69,6 +69,8 @@ mkdir -p $tmpdir
 mkdir -p $tmpdir/downsample
 mkdir -p $tmpdir/trans
 
+mkdir -p conf/${full_name}
+
 soxerr=$tmpdir/soxerr;
 
 for x in train dev eval; do
@@ -83,7 +85,7 @@ for x in train dev eval; do
         base=`basename $line .wav`
         wavfile="$SBSDIR/$full_name/$base.wav"
         outwavfile="data/$LCODE/wav/$x/$base.wav"
-        [[ -e $outwavfile ]] || sox $wavfile -r 8000 -t wav $outwavfile 
+        [[ -e $outwavfile ]] || sox $wavfile -R -r 8000 -t wav $outwavfile
         if [ $? -ne 0 ]; then
             echo "$wavfile: exit status = $?" >> $soxerr
             let "nsoxerr+=1"
@@ -141,7 +143,7 @@ for x in train dev eval; do
             local/sbs_create_phntrans_UR.sh $tmpdir/downsample/${x}_basenames_wav conf/${full_name}/g2pmap.txt $TRANSDIR/${full_name} | LC_ALL=en_US.UTF-8 local/uniphone.py | sed 's/eps//g' | sed 's/   */ /g' | sed 's/^ *//g' | sed 's/ *$//g' > $tmpdir/${LCODE}_${x}.trans
             ;;
         CA)
-            local/sbs_create_phntrans_CA.py --utts $tmpdir/downsample/${x}_basenames_wav --transdir "$TRANSDIR/${full_name}" > $tmpdir/${LCODE}_${x}.trans
+            local/sbs_create_phntrans_CA.py --utts $tmpdir/downsample/${x}_basenames_wav --transdir "$TRANSDIR/${full_name}" | sed 's/g/ɡ/g' | LC_ALL=en_US.UTF-8 local/uniphone.py | sed 's/ *sil */ /g' | sed 's/  \+/ /g' | sed 's/ \+$//g' | sed 's/^ \+//g' > $tmpdir/${LCODE}_${x}.trans
             ;;
         *) 
             echo "Unknown language code $LCODE." && exit 1

@@ -5,7 +5,7 @@
 
 decode_nj=4
 
-SBS_LANG="MD SW AR DT HG UR"
+SBS_LANG="AR CA DT MD HG SW UR"
 
 gmmdir=exp/tri3b
 data_fmllr=data-fmllr-tri3b

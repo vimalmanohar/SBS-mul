@@ -74,7 +74,7 @@ gunzip -c $lmdir/lm_phone.arpa.gz | \
  # Because of the <s> fiasco for these particular LMs, the first number is not
  # as close to zero as it could be.
 
-utils/validate_lang.pl data/lang_test || exit 1
+local/validate_lang.pl data/lang_test
 
 echo "Done preparing G."
 

@@ -24,7 +24,7 @@ feats_nj=4
 train_nj=8
 decode_nj=4
 
-SBS_LANG="MD SW AR DT HG UR"
+SBS_LANG="AR CA DT HG MD SW UR"
 
 # Config:
 gmmdir=exp/tri3b
