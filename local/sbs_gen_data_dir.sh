@@ -98,6 +98,8 @@ sed -e 's:\-.*$::' $tmpdir/downsample/unsup_basenames_wav | \
 
 ./utils/utt2spk_to_spk2utt.pl data/${LCODE}/local/data/unsup_utt2spk > data/${LCODE}/local/data/unsup_spk2utt || exit 1;
 
+mkdir -p data/$LCODE/unsup
+
 cp data/$LCODE/local/data/unsup_wav.scp data/$LCODE/unsup/wav.scp
 cp data/$LCODE/local/data/unsup_utt2spk data/$LCODE/unsup/utt2spk
 cp data/$LCODE/local/data/unsup_spk2utt data/$LCODE/unsup/spk2utt
