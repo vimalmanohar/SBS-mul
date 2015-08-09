@@ -8,23 +8,31 @@
 # Set the location of the SBS speech
 SBS_CORPUS=/export/ws15-pt-data/data/audio
 
+LANG="SW"   # Target language
+
 feats_nj=40
 train_nj=20
 decode_nj=5
-parallel_opts="--num-threads 6"
-num_copies=3
-threshold=0.7
+stage=-100 # resume training with --stage=N
 
-LANG="SW"
+# Semi-supervised training options
+num_copies=3    # Make this many copies of supervised data
+threshold=      # If provided, use frame thresholding -- keep only frames whose
+                # best path posterior is above this value
 
-# Config:
+# Decode Config:
 acwt=0.2
+parallel_opts="--num-threads 6"
+
 gmmdir=exp/tri3b
 data_fmllr=data-fmllr-tri3b
-dnndir=exp/dnn4_pretrain-dbn_dnn
-dir=exp/dnn5_pretrain-dbn_dnn_semisup
-stage=-100 # resume training with --stage=N
 graph_dir=exp/tri3b/graph
+feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
+dbn=exp/dnn4_pretrain-dbn/6.dbn
+dnndir=exp/dnn4_pretrain-dbn_dnn
+
+dir=exp/dnn5_pretrain-dbn_dnn_semisup
+
 # End of config.
 
 set -o pipefail
@@ -138,9 +146,6 @@ if [ $stage -le 4 ]; then
 
   utils/combine_data.sh $data_fmllr/train_tr90_${num_copies}x $copied_data_dirs
 fi
-
-feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
-dbn=exp/dnn4_pretrain-dbn/6.dbn
 
 if [ $stage -le 5 ]; then
   utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/unsup_4k_$L $data_fmllr/train_tr90_${num_copies}x 
