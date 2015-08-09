@@ -6,10 +6,10 @@
 # the number of cpus on your machine.
 
 #a) JHU cluster options
-export train_cmd="queue.pl -l mem_free=2G,ram_free=2G"
-export decode_cmd="queue.pl -l mem_free=2G,ram_free=2G"
-export mkgraph_cmd="queue.pl -l mem_free=2G,ram_free=2G"
-export big_memory_cmd="queue.pl -l mem_free=8G,ram_free=8G"
+export train_cmd="queue.pl --mem 2G"
+export decode_cmd="queue.pl --mem 2G"
+export mkgraph_cmd="queue.pl --mem 2G"
+export big_memory_cmd="queue.pl --mem 8G"
 export cuda_cmd="queue.pl --gpu 1"
 
 #b) BUT cluster options

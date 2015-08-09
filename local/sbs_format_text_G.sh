@@ -22,10 +22,13 @@ if [ $# -lt 1 ]; then
   echo -e $usage; exit 1;
 fi
 
+TEXT_PHONE_LM=/export/ws15-pt-data/data/text-phnlm
+
 while [ $# -gt 0 ];
 do
   case "$1" in
   --help) echo -e $usage; exit 0 ;;
+  --text-phone-lm) TEXT_PHONE_LM=$2; shift; shift ;;
   ??) LCODE=$1; shift ;;
   *)  echo "Unknown argument: $1, exiting"; echo -e $usage; exit 1 ;;
   esac
@@ -53,7 +56,7 @@ fstprint --isymbols=data/lang_test/phones.txt --osymbols=data/lang_test/words.tx
   | fstcompile --isymbols=data/lang_test/phones.txt --osymbols=data/lang_test/words.txt \
   > $test/L_disambig.fst
 
-cat /export/ws15-pt-data/data/text-phnlm/${LCODE}/bigram.lm | \
+cat $TEXT_PHONE_LM/${LCODE}/bigram.lm | \
   sed 's/\tg/\tɡ/g' | sed 's/ g/ ɡ/g' | \
   sed 's/sil/!SIL/g' | \
   egrep -v '<s> <s>|</s> <s>|</s> </s>' | \

@@ -14,10 +14,13 @@ set -e
 . ./path.sh
 
 SBS_LANGUAGES="AR CA DT HG MD SW UR"
+TEXT_PHONE_LM=/export/ws15-pt-data/data/text-phnlm
+
+. utils/parse_options.sh
 
 for L in $SBS_LANGUAGES; do
   echo "Prep oracle G for $L"
-  local/sbs_format_text_G.sh $L
+  local/sbs_format_text_G.sh --text-phone-lm $TEXT_PHONE_LM $L
 done
 
 # Decode with oracle G: mono
