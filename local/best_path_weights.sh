@@ -37,6 +37,8 @@ set -e
 # begin configuration section.
 cmd=run.pl
 stage=-10
+write_ali_dir=true
+acwt=0.1
 #end configuration section.
 
 help_message="Usage: "$(basename $0)" [options] <data-dir> <graph-dir|lang-dir> <decode-dir1>[:weight] <decode-dir2>[:weight] [<decode-dir3>[:weight] ... ] <out-dir>
@@ -61,7 +63,6 @@ shift 2;
 decode_dirs=( $@ )  # read the remaining arguments into an array
 unset decode_dirs[${#decode_dirs[@]}-1]  # 'pop' the last argument which is odir
 num_sys=${#decode_dirs[@]}  # number of systems to combine
-write_ali_dir=true
 
 mkdir -p $dir
 mkdir -p $dir/log
@@ -79,7 +80,7 @@ mkdir -p $out_decode
 if [ $stage -lt -1 ]; then
   mkdir -p $out_decode/log
   $cmd JOB=1:$nj $out_decode/log/best_path.JOB.log \
-    lattice-best-path --acoustic-scale=0.1 \
+    lattice-best-path --acoustic-scale=$acwt \
     "ark,s,cs:gunzip -c $decode_dir/lat.JOB.gz |" \
     ark:/dev/null "ark:| gzip -c > $out_decode/ali.JOB.gz" || exit 1
 fi

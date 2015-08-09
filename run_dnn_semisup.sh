@@ -14,6 +14,7 @@ decode_nj=5
 parallel_opts="--num-threads 6"
 num_copies=3
 threshold=0.7
+use_soft_counts=false
 
 LANG="SW"
 
@@ -63,20 +64,22 @@ if [ $stage -le -1 ]; then
     $featdir data/$L/unsup_4k $gmmdir $featdir/log $featdir/data 
 fi
 
+decode_dir=$dnndir/decode${graph_affix}_unsup_4k_$L
+best_path_dir=$dnndir/best_path${graph_affix}_unsup_4k_$L
+
 if [ $stage -le 0 ]; then
   steps/nnet/decode.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --acwt $acwt --skip-scoring true \
-    $graph_dir $data_fmllr/unsup_4k_$L $dnndir/decode${graph_affix}_unsup_4k_$L
+    $graph_dir $data_fmllr/unsup_4k_$L $decode_dir
 fi
 
-best_path_dir=$dnndir/best_path_unsup_4k_$L
 
-postdir=$dnndir/post_semisup_4k${threshold:-_$threshold}
+postdir=$dnndir/post${graph_affix}_semisup_4k${threshold:-_$threshold}
 
 if [ $stage -le 1 ]; then
   L=$LANG
-  local/best_path_weights.sh data/$L/unsup_4k $graph_dir \
-    $dnndir/decode${graph_affix}_unsup_4k_$L $dnndir/best_path${graph_affix}_unsup_4k_$L
+  local/best_path_weights.sh --acwt $acwt data/$L/unsup_4k $graph_dir \
+    $decode_dir $dnndir/best_path${graph_affix}_unsup_4k_$L
 fi
 
 
@@ -98,10 +101,16 @@ fi
 
 if [ $stage -le 3 ]; then
   nj=$(cat $best_path_dir/num_jobs)
-  $train_cmd JOB=1:$nj $postdir/get_unsup_post.JOB.log \
-    ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $best_path_dir/ali.JOB.gz |" ark:- \| \
-    ali-to-post ark:- ark,scp:$postdir/unsup_post.JOB.ark,$postdir/unsup_post.JOB.scp || exit 1
-
+  if ! $use_soft_counts; then
+    $train_cmd JOB=1:$nj $postdir/get_unsup_post.JOB.log \
+      ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $best_path_dir/ali.JOB.gz |" ark:- \| \
+      ali-to-post ark:- ark,scp:$postdir/unsup_post.JOB.ark,$postdir/unsup_post.JOB.scp || exit 1
+  else 
+    $train_cmd JOB=1:$nj $postdir/get_unsup_soft_post.JOB.log \
+      lattice-to-post --acoustic-scale=$acwt "ark:gunzip -c $decode_dir/lat.JOB.gz |" ark:- \| \
+      post-to-pdf-post $gmmdir/final.mdl ark:- \
+      ark,scp:$postdir/unsup_post.JOB.ark,$postdir/unsup_post.JOB.scp || exit 1
+  fi
   for n in `seq $nj`; do
     cat $postdir/unsup_post.$n.scp
   done > $postdir/unsup_post.scp
@@ -160,7 +169,7 @@ if [ $stage -le 5 ]; then
 fi
 
 if [ $stage -le 6 ]; then
-  steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/MD/train $dir
+  steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/train $dir
   cp $dnndir/final.mdl $dir
 fi
 
@@ -168,6 +177,6 @@ if [ $stage -le 7 ]; then
   # Decode (reuse HCLG graph)
   for lang in $L; do
     steps/nnet/decode.sh $parallel_opts --nj $decode_nj --cmd "$decode_cmd" --acwt $acwt \
-      $graph_dir $data_fmllr/eval_$lang $dir/decode${graph_affix}_eval_$lang || exit 1
+      $graph_dir $data_fmllr/dev_$lang $dir/decode${graph_affix}_dev_$lang || exit 1
   done
 fi
