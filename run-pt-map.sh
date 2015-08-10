@@ -11,7 +11,11 @@ echo `date` && echo $0
 
 . path.sh || { echo "Cannot source path.sh"; exit 1; }
 
-stage=4
+set -e 
+set -o pipefail
+set -u
+
+stage=-4
 
 LANG="SW"
 
@@ -27,6 +31,14 @@ dir_fsts=exp/data_pt
 feats_nj=4
 train_nj=8
 decode_nj=4
+
+. utils/parse_options.sh
+
+if [ $# -ne 0 ]; then
+  echo "Usage: $0"
+  echo " e.g.: $0 --LANG MD"
+  exit 1
+fi
 
 # # generate alignment for training data if needed
 # 
@@ -82,11 +94,12 @@ if [ $stage -le 4 ]; then
   echo "Decoding"
 
   graph_dir=$exp_dir/graph_text_G
+  graph_id=${graph_dir#*graph}
   mkdir -p $graph_dir
   utils/mkgraph.sh data/$LANG/lang_test_text_G $exp_dir $graph_dir
 
   steps/decode_fmllr.sh --nj "$decode_nj" --cmd "$decode_cmd" $graph_dir \
-    data/$LANG/dev $exp_dir/decode_dev
+    data/$LANG/dev $exp_dir/decode${graph_id}_dev
 fi
 
 echo `date`
