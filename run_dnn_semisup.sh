@@ -17,7 +17,6 @@ LANG="SW"   # Target language
 feats_nj=40
 train_nj=20
 decode_nj=5
-
 stage=-100 # resume training with --stage=N
 
 # Semi-supervised training options
