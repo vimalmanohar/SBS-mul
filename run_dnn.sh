@@ -20,6 +20,10 @@
 
 . ./path.sh ## Source the tools/utils (import the queue.pl)
 
+set -e
+set -o pipefail
+set -u
+
 feats_nj=4
 train_nj=8
 decode_nj=4
@@ -37,7 +41,7 @@ stage=0 # resume training with --stage=N
 echo ==========================
 if [ $stage -le 0 ]; then
 steps/align_fmllr.sh --nj "$train_nj" --cmd "$train_cmd" \
-  data/train data/lang exp/tri3b exp/tri3b_ali
+  data/train data/lang $gmmdir ${gmmdir}_ali
 fi
 echo ==========================
 
