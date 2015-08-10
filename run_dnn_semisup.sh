@@ -5,6 +5,10 @@
 
 . ./path.sh ## Source the tools/utils (import the queue.pl)
 
+set -e 
+set -o pipefail
+set -u
+
 # Set the location of the SBS speech
 SBS_CORPUS=/export/ws15-pt-data/data/audio
 
@@ -47,15 +51,15 @@ L=$LANG
 
 if [ $stage -le -4 ]; then
   local/sbs_gen_data_dir.sh --corpus-dir=$SBS_CORPUS \
-    --lang-map=conf/lang_codes.txt $LANG
+    --lang-map=conf/lang_codes.txt $LANG || exit 1
 fi
 
 if [ $stage -le -3 ]; then
   mfccdir=mfcc/$L
-  steps/make_mfcc.sh --nj $feats_nj --cmd "$train_cmd" data/$L/unsup exp/$L/make_mfcc/unsup $mfccdir
+  steps/make_mfcc.sh --nj $feats_nj --cmd "$train_cmd" data/$L/unsup exp/$L/make_mfcc/unsup $mfccdir || exit 1
 
-  utils/subset_data_dir.sh data/$L/unsup 4000 data/$L/unsup_4k
-  steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir
+  utils/subset_data_dir.sh data/$L/unsup 4000 data/$L/unsup_4k || exit 1
+  steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir || exit 1
 fi
 
 graph_affix=${graph_dir#*graph}
@@ -63,14 +67,14 @@ graph_affix=${graph_dir#*graph}
 if [ $stage -le -2 ]; then
   steps/decode_fmllr.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --skip-scoring true --acwt $acwt \
-    $graph_dir data/$L/unsup_4k $gmmdir/decode${graph_affix}_unsup_4k_$L
+    $graph_dir data/$L/unsup_4k $gmmdir/decode${graph_affix}_unsup_4k_$L || exit 1
 fi
 
 if [ $stage -le -1 ]; then
   featdir=$data_fmllr/unsup_4k_$L
   steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
     --transform-dir $gmmdir/decode${graph_affix}_unsup_4k_$L \
-    $featdir data/$L/unsup_4k $gmmdir $featdir/log $featdir/data 
+    $featdir data/$L/unsup_4k $gmmdir $featdir/log $featdir/data  || exit 1
 fi
 
 decode_dir=$dnndir/decode${graph_affix}_unsup_4k_$L
@@ -79,7 +83,7 @@ best_path_dir=$dnndir/best_path${graph_affix}_unsup_4k_$L
 if [ $stage -le 0 ]; then
   steps/nnet/decode.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --acwt $acwt --skip-scoring true \
-    $graph_dir $data_fmllr/unsup_4k_$L $decode_dir
+    $graph_dir $data_fmllr/unsup_4k_$L $decode_dir || exit 1
 fi
 
 
@@ -88,7 +92,7 @@ postdir=$dnndir/post${graph_affix}_semisup_4k${threshold:-_$threshold}
 if [ $stage -le 1 ]; then
   L=$LANG
   local/best_path_weights.sh --acwt $acwt data/$L/unsup_4k $graph_dir \
-    $decode_dir $dnndir/best_path${graph_affix}_unsup_4k_$L
+    $decode_dir $dnndir/best_path${graph_affix}_unsup_4k_$L || exit 1
 fi
 
 
@@ -150,17 +154,17 @@ if [ $stage -le 4 ]; then
   copied_data_dirs=
   for i in `seq 0 $[num_copies-1]`; do
     utils/copy_data_dir.sh --utt-prefix ${i}- --spk-prefix ${i}- $data_fmllr/train_tr90 \
-      $data_fmllr/train_tr90_$i
+      $data_fmllr/train_tr90_$i || exit 1
     copied_data_dirs="$copied_data_dirs $data_fmllr/train_tr90_$i"
   done
 
-  utils/combine_data.sh $data_fmllr/train_tr90_${num_copies}x $copied_data_dirs
+  utils/combine_data.sh $data_fmllr/train_tr90_${num_copies}x $copied_data_dirs || exit 1
 fi
 
 if [ $stage -le 5 ]; then
-  utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/unsup_4k_$L $data_fmllr/train_tr90_${num_copies}x 
+  utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/unsup_4k_$L $data_fmllr/train_tr90_${num_copies}x  || exit 1
   utils/copy_data_dir.sh --utt-prefix 0- --spk-prefix 0- $data_fmllr/train_cv10 \
-    $data_fmllr/train_cv10_0
+    $data_fmllr/train_cv10_0 || exit 1
   
   sort -k1,1 $postdir/unsup_post.scp $postdir/train_post_${num_copies}x.scp > $dir/all_post.scp
   sort -k1,1 $postdir/unsup_frame_weights.scp $postdir/train_frame_weights_${num_copies}x.scp > $dir/all_frame_weights.scp
@@ -175,7 +179,7 @@ if [ $stage -le 5 ]; then
 fi
 
 if [ $stage -le 6 ]; then
-  steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/train $dir
+  steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/train $dir || exit 1
   cp $dnndir/final.mdl $dir
 fi
 
