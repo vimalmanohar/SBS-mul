@@ -20,23 +20,23 @@ decode_nj=5
 stage=-100 # resume training with --stage=N
 
 # Semi-supervised training options
-num_copies=3    # Make this many copies of supervised data
-threshold=      # If provided, use frame thresholding -- keep only frames whose
-                # best path posterior is above this value
-use_soft_counts=false
+num_copies=2    # Make this many copies of supervised data
+threshold=0.7   # If provided, use frame thresholding -- keep only frames whose
+                # best path posterior is above this value.  
+use_soft_counts=true    # Use soft-counts as targets for unlabeled data
 
 # Decode Config:
 acwt=0.2
 parallel_opts="--num-threads 6"
 
-gmmdir=exp/tri3b
-data_fmllr=data-fmllr-tri3b
-graph_dir=exp/tri3b/graph
-feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
-dbn=exp/dnn4_pretrain-dbn/6.dbn
-dnndir=exp/dnn4_pretrain-dbn_dnn
+gmmdir=exp/tri3b                    # SAT GMM to get fMLLR transforms for unlabeled data
+data_fmllr=data-fmllr-tri3b         # Directory to store fMLLR feats of unlabeled data
+graph_dir=exp/tri3b/$LANG/graph_text_G    # Graph directory used while decoding unlabeled data and dev data
+feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform   # DBN feature transform used with the seed DBN
+dbn=exp/dnn4_pretrain-dbn/6.dbn     # Seed DBN used to initialize semi-supervised DNN
+dnndir=exp/dnn4_pretrain-dbn_dnn    # Seed DNN used for decoding the unlabeled data
 
-dir=exp/dnn5_pretrain-dbn_dnn_semisup
+dir=exp/dnn5_pretrain-dbn_dnn_semisup   # Directory to store final DNN
 
 # End of config.
 
@@ -48,11 +48,15 @@ set -u
 
 L=$LANG
 
+# Prepare unsupervised data
 if [ $stage -le -4 ]; then
   local/sbs_gen_data_dir.sh --corpus-dir=$SBS_CORPUS \
     --lang-map=conf/lang_codes.txt $LANG || exit 1
 fi
 
+# Prepare features for a subset of 4000 utterance ~ 8hrs of data. This is to
+# maintain unifority across different languages that have different 
+# amount of unlabeled data
 if [ $stage -le -3 ]; then
   mfccdir=mfcc/$L
   steps/make_mfcc.sh --nj $feats_nj --cmd "$train_cmd" data/$L/unsup exp/$L/make_mfcc/unsup $mfccdir || exit 1
@@ -61,14 +65,15 @@ if [ $stage -le -3 ]; then
   steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir || exit 1
 fi
 
+# Decode unlabeled data using GMM
 graph_affix=${graph_dir#*graph}
-
 if [ $stage -le -2 ]; then
   steps/decode_fmllr.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --skip-scoring true --acwt $acwt \
     $graph_dir data/$L/unsup_4k $gmmdir/decode${graph_affix}_unsup_4k_$L || exit 1
 fi
 
+# Create fMLLR features of the unlabeled data
 if [ $stage -le -1 ]; then
   featdir=$data_fmllr/unsup_4k_$L
   steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
@@ -79,22 +84,24 @@ fi
 decode_dir=$dnndir/decode${graph_affix}_unsup_4k_$L
 best_path_dir=$dnndir/best_path${graph_affix}_unsup_4k_$L
 
+# Decode unlabeled data using DNN
 if [ $stage -le 0 ]; then
   steps/nnet/decode.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
     --acwt $acwt --skip-scoring true \
     $graph_dir $data_fmllr/unsup_4k_$L $decode_dir || exit 1
 fi
 
+postdir=$dnndir/post${graph_affix}_semisup_4k${threshold:+_$threshold}
 
-postdir=$dnndir/post${graph_affix}_semisup_4k${threshold:-_$threshold}
-
+# Find best path and frame weights for unlabeled data
 if [ $stage -le 1 ]; then
   L=$LANG
   local/best_path_weights.sh --acwt $acwt data/$L/unsup_4k $graph_dir \
     $decode_dir $dnndir/best_path${graph_affix}_unsup_4k_$L || exit 1
 fi
 
-
+# Converted alignments of the labeled (DT) data from all seen languages into 
+# one-hot posteriors and frame weights
 if [ $stage -le 2 ]; then
   nj=$(cat $gmmdir/num_jobs)
   $train_cmd JOB=1:$nj $postdir/get_train_post.JOB.log \
@@ -118,6 +125,7 @@ if [ $stage -le 3 ]; then
       ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $best_path_dir/ali.JOB.gz |" ark:- \| \
       ali-to-post ark:- ark,scp:$postdir/unsup_post.JOB.ark,$postdir/unsup_post.JOB.scp || exit 1
   else 
+    # Get soft-counts for unlabeled data of target language 
     $train_cmd JOB=1:$nj $postdir/get_unsup_soft_post.JOB.log \
       lattice-to-post --acoustic-scale=$acwt "ark:gunzip -c $decode_dir/lat.JOB.gz |" ark:- \| \
       post-to-pdf-post $gmmdir/final.mdl ark:- \
@@ -132,6 +140,7 @@ if [ $stage -le 3 ]; then
     copy_command="thresh-vector --threshold=$threshold --lower-cap=0.0 --upper-cap=1.0"
   fi
 
+  # Apply binary threshold on the frame weights 
   $train_cmd JOB=1:$nj $postdir/copy_frame_weights.JOB.log \
     $copy_command "ark:gunzip -c $best_path_dir/weights.JOB.gz |" \
     ark,scp:$postdir/unsup_frame_weights.JOB.ark,$postdir/unsup_frame_weights.JOB.scp || exit 1
@@ -141,6 +150,8 @@ if [ $stage -le 3 ]; then
   done > $postdir/unsup_frame_weights.scp
 fi
 
+# Make copies of labeled data to give higher weight to the labeled data
+# relative to the unlabeled data
 if [ $stage -le 4 ]; then
   awk -v num_copies=$num_copies \
     '{for (i=0; i<num_copies; i++) { print i"-"$1" "$2 } }' \
@@ -160,6 +171,8 @@ if [ $stage -le 4 ]; then
   utils/combine_data.sh $data_fmllr/train_tr90_${num_copies}x $copied_data_dirs || exit 1
 fi
 
+# Train a DNN starting from the DBN using the labeled data from seen languages
+# and unlabeled data from target language
 if [ $stage -le 5 ]; then
   utils/combine_data.sh $dir/data_semisup_4k_${num_copies}x $data_fmllr/unsup_4k_$L $data_fmllr/train_tr90_${num_copies}x  || exit 1
   utils/copy_data_dir.sh --utt-prefix 0- --spk-prefix 0- $data_fmllr/train_cv10 \
@@ -177,6 +190,7 @@ if [ $stage -le 5 ]; then
     data/$L/lang dummy dummy $dir || exit 1;
 fi
 
+# Get posteriors for the trained semi-supervised DNN
 if [ $stage -le 6 ]; then
   steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/train $dir || exit 1
   cp $dnndir/final.mdl $dir
