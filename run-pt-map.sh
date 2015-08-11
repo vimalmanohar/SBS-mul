@@ -32,6 +32,8 @@ feats_nj=4
 train_nj=8
 decode_nj=4
 
+parallel_opts="--num-threads 6"
+
 . utils/parse_options.sh
 
 if [ $# -ne 0 ]; then
@@ -98,8 +100,8 @@ if [ $stage -le 4 ]; then
   mkdir -p $graph_dir
   utils/mkgraph.sh data/$LANG/lang_test_text_G $exp_dir $graph_dir
 
-  steps/decode_fmllr.sh --nj "$decode_nj" --cmd "$decode_cmd" $graph_dir \
-    data/$LANG/dev $exp_dir/decode${graph_id}_dev_$LANG
+  steps/decode_fmllr.sh $parallel_opts --nj "$decode_nj" --cmd "$decode_cmd" $graph_dir \
+    data/$LANG/dev $exp_dir/decode${graph_id}_dev
 fi
 
 echo `date`
