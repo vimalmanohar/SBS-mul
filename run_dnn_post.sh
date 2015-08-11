@@ -18,6 +18,10 @@ srcdir=exp/dnn4_pretrain-dbn_dnn
 gmmdir=exp/tri3b_map_MD_pt
 data_fmllr=data-fmllr-tri3b_map_MD_pt
 postdir=exp/tri3b_map_MD_pt
+
+test_dir=data/MD/dev
+test_transform_dir=exp/tri3b_map_MD_pt/decode_text_G_dev
+graph_dir=exp/tri3b_map_MD_pt//graph_text_G
 stage=0 # resume training with --stage=N
 
 prune_threshold=0.7
@@ -43,7 +47,7 @@ if [ $stage -le 1 ]; then
   $train_cmd JOB=1:$nj $frame_weights_dir/log/get_frame_weights.JOB.log \
     copy-post --prune-threshold=$prune_threshold "ark:gunzip -c $postdir/post.JOB.gz |" ark:- \| \
     post-to-weights ark:- ark:- \| \
-    thresh-vector --threshold=$threshold ark:- \
+    thresh-vector --threshold=$threshold --lower-cap=0.0 ark:- \
     ark,scp:$frame_weights_dir/frame_weights.JOB.ark,$frame_weights_dir/frame_weights.JOB.scp || exit 1
 
   for n in `seq $nj`; do 
@@ -74,10 +78,18 @@ if [ $stage -le 3 ]; then
   steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/$LANG/train $dir
 fi
 
+
 if [ $stage -le 4 ]; then
+  test_id=`basename $test_dir`
+  steps/nnet/make_fmllr_feats.sh --nj $decode_nj --cmd "$train_cmd" \
+    --transform-dir $test_transform_dir $data_fmllr/${test_id}_$LANG \
+    $test_dir $gmmdir exp/make_fmllr_feats/${test_id}_$LANG/log fmllr_feats/${test_id}_$LANG || exit 1
+fi
+
+if [ $stage -le 5 ]; then
   # Decode (reuse HCLG graph)
-  for lang in $LANG; do
-    steps/nnet/decode.sh --nj $decode_nj --cmd "$decode_cmd" --acwt 0.2 \
-      $gmmdir/graph $data_fmllr/eval_$lang $dir/decode_eval_$lang || exit 1
-  done
+  graph_id=${graph_dir#*graph}
+  test_id=`basename $test_dir`
+  steps/nnet/decode.sh --nj $decode_nj --cmd "$decode_cmd" --acwt 0.2 \
+    $graph_dir $data_fmllr/${test_id}_$LANG $dir/decode${graph_id}_${test_id}_$LANG || exit 1
 fi
