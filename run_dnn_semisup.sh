@@ -36,8 +36,6 @@ feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform   # DBN feature 
 dbn=exp/dnn4_pretrain-dbn/6.dbn     # Seed DBN used to initialize semi-supervised DNN
 dnndir=exp/dnn4_pretrain-dbn_dnn    # Seed DNN used for decoding the unlabeled data
 
-dir=exp/dnn5_pretrain-dbn_dnn_semisup   # Directory to store final DNN
-
 # End of config.
 
 set -o pipefail
@@ -45,6 +43,8 @@ set -e
 set -u 
 
 . utils/parse_options.sh
+
+dir=${dnndir}_semisup${num_copies}x${threshold:+_thres$threshold}
 
 L=$LANG
 

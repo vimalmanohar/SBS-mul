@@ -15,13 +15,13 @@ set -u
 LANG=MD
 
 srcdir=exp/dnn4_pretrain-dbn_dnn
-gmmdir=exp/tri3b_map_MD_pt
-data_fmllr=data-fmllr-tri3b_map_MD_pt
-postdir=exp/tri3b_map_MD_pt
+gmmdir=exp/tri3b_map_${LANG}_pt
+data_fmllr=data-fmllr-tri3b_map_${LANG}_pt
+postdir=exp/tri3b_map_${LANG}_pt
 
-test_dir=data/MD/dev
-test_transform_dir=exp/tri3b_map_MD_pt/decode_text_G_dev
-graph_dir=exp/tri3b_map_MD_pt//graph_text_G
+test_dir=data/${LANG}/dev
+test_transform_dir=exp/tri3b_map_${LANG}_pt/decode_text_G_dev
+graph_dir=exp/tri3b_map_${LANG}_pt//graph_text_G
 stage=0 # resume training with --stage=N
 
 prune_threshold=0.7
@@ -71,7 +71,7 @@ if [ $stage -le 2 ]; then
     steps/nnet/train.sh --feature-transform $feature_transform --nnet-init $dir/pre_init.nnet --hid-layers 0 --learn-rate 0.008 \
     --labels "ark:gunzip -c $postdir/post.$idx_list.gz | post-to-pdf-post $postdir/final.mdl ark:- ark:- |" \
     --frame-weights scp:$frame_weights_dir/frame_weights.scp \
-    $data_fmllr/MD/train_tr90 $data_fmllr/MD/train_cv10 data/$LANG/lang dummy dummy $dir || exit 1;
+    $data_fmllr/$LANG/train_tr90 $data_fmllr/$LANG/train_cv10 data/$LANG/lang dummy dummy $dir || exit 1;
 fi
 
 if [ $stage -le 3 ]; then

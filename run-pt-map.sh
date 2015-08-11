@@ -99,7 +99,7 @@ if [ $stage -le 4 ]; then
   utils/mkgraph.sh data/$LANG/lang_test_text_G $exp_dir $graph_dir
 
   steps/decode_fmllr.sh --nj "$decode_nj" --cmd "$decode_cmd" $graph_dir \
-    data/$LANG/dev $exp_dir/decode${graph_id}_dev
+    data/$LANG/dev $exp_dir/decode${graph_id}_dev_$LANG
 fi
 
 echo `date`
