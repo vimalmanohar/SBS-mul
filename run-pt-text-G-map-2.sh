@@ -21,7 +21,7 @@ SBS_DATA_LISTS=/export/ws15-pt-data/data/lists
 #export SBS_LANGUAGES="AR DT MD HG SW UR"
 #export TRAIN_LANG="SW AR UR DT HG"
 #export TEST_LANG="MD"
-export TEST_LANG="SW"
+#export TEST_LANG="SW"
 
 stage=0
 #---------------------------------------------------------------------------
@@ -41,11 +41,11 @@ fi
 
 # add the directory of raw pt, e.g.,
 #dir_raw_pt=/export/ws15-pt-data/data/phonelattices/monophones/trainedp2let/HG_MD_UR_DT_AR_CA_SWdecode
-dir_raw_pt= 
+dir_raw_pt=/export/ws15-pt-data2/data/pt-stable-7/held-out-$TEST_LANG
 
 if [ -z $dir_raw_pt ]; then echo "empty dir_raw_pt" && exit 1;fi
 
-dir_fsts=exp/data_pt
+dir_fsts=exp/data_pt-2
 dir_lang=data/$TEST_LANG/lang_test_text_G
 if [ $stage -le 0 ]; then
   # first, generate G_new.fst
@@ -131,12 +131,13 @@ for L in $TEST_LANG; do
     echo ------------------------------------------
   fi
 
-  exp_dir=exp/tri3b_map_${L}_g_pt_text_G
+  num_iters=12
+  exp_dir=exp/tri3b_map_${L}_g_pt_text_G_it${num_iters}
   if [ $stage -le 2 ]; then
     echo "Adapting to PTs"
 
     #local/train_sat_map_pt.sh \
-    local/train_sat_map_pt.sh --cmd "$train_cmd" \
+    local/train_sat_map_pt.sh --cmd "$train_cmd" --num-iters ${num_iters} \
       data/$L/train $dir_lang $alidir_g_pt $exp_dir || exit 1;
     echo ------------------------------------------
   fi

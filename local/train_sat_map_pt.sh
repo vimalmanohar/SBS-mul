@@ -143,10 +143,10 @@ fi
 if [ $stage -le 0 ] && [ "$realign_iters" != "" ]; then
   echo "$0: Using the graphs of pt generated in the alignment stage"
   if [ -L $dir/fsts.1.gz ]; then
-    echo "fsts.1.gz exists, remove it and soft link from $alidir"
+    echo "fsts.1.gz exists, remove it and copy from $alidir"
     rm $dir/fsts.*.gz
   fi
-  ln -s $alidir/fsts.*.gz $dir || exit 1;
+  cp $alidir/fsts.*.gz $dir || exit 1;
 fi
 
 x=1
