@@ -47,7 +47,7 @@ nj=$(cat $postdir/num_jobs) || exit 1
 frame_weights_dir=${gmmdir}/frame_weights
 if [ $stage -le 1 ]; then
   $train_cmd JOB=1:$nj $frame_weights_dir/log/get_frame_weights.JOB.log \
-    copy-post --prune-threshold=$prune_threshold "ark:gunzip -c $postdir/post.JOB.gz |" ark:- \| \
+    copy-post --prune-threshold=$prune_threshold "ark:gunzip -c $postdir/post.JOB.gz | post-to-pdf-post $postdir/final.mdl ark:- ark:- |" ark:- \| \
     post-to-weights ark:- ark:- \| \
     thresh-vector --threshold=$threshold --lower-cap=0.0 ark:- \
     ark,scp:$frame_weights_dir/frame_weights.JOB.ark,$frame_weights_dir/frame_weights.JOB.scp || exit 1
