@@ -31,6 +31,8 @@ feats_nj=10
 train_nj=10
 decode_nj=5
 
+reinit_softmax=true
+
 dir=${srcdir}_${LANG}_pt_${prune_threshold}
 
 . utils/parse_options.sh 
@@ -63,7 +65,11 @@ feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
 if [ $stage -le 2 ]; then
   # Train the DNN optimizing per-frame cross-entropy.
   # Train
-  local/utils/nnet/renew_nnet_softmax.sh $postdir/final.mdl $srcdir/final.nnet $dir/prepre_init.nnet > $dir/log/prepre_init.log
+  if $reinit_softmax; then
+    local/utils/nnet/renew_nnet_softmax.sh $postdir/final.mdl $srcdir/final.nnet $dir/prepre_init.nnet > $dir/log/prepre_init.log
+  else 
+    cp $srcdir/final.nnet $dir/prepre_init.nnet
+  fi
   $train_cmd $dir/log/pre_init.log \
     nnet-copy --learning-rate-scales="0:0:0:0:0:0:1" $dir/prepre_init.nnet $dir/pre_init.nnet
   cp $postdir/final.mdl $dir    
