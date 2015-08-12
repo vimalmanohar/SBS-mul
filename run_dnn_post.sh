@@ -14,14 +14,14 @@ set -u
 
 LANG=MD
 
-srcdir=exp/dnn4_pretrain-dbn_dnn
-gmmdir=exp/tri3b_map_${LANG}_pt
-data_fmllr=data-fmllr-tri3b_map_${LANG}_pt
-postdir=exp/tri3b_map_${LANG}_pt
+srcdir=exp/dnn4_pretrain-dbn_dnn    # DNN to be adapted
+gmmdir=exp/tri3b_ali_map_${LANG}_pt     # GMM dir to get transforms from
+data_fmllr=data-fmllr-tri3b             # Feats matching those from gmmdir
+postdir=exp/tri3b_map_${LANG}_pt        # Directory to get posteriors from
 
-test_dir=data/${LANG}/dev
-test_transform_dir=exp/tri3b_map_${LANG}_pt/decode_text_G_dev
-graph_dir=exp/tri3b_map_${LANG}_pt//graph_text_G
+test_dir=data/${LANG}/dev           
+test_transform_dir=exp/tri3b/decode_text_G_dev   # Test transform dir. Must match the GMM dir model.
+graph_dir=exp/tri3b_map_${LANG}_pt//graph_text_G  # Graph from the posterior directory
 stage=0 # resume training with --stage=N
 
 prune_threshold=0.7
@@ -44,7 +44,7 @@ if [ $stage -le 0 ]; then
 fi
 
 nj=$(cat $postdir/num_jobs) || exit 1
-frame_weights_dir=${gmmdir}/frame_weights
+frame_weights_dir=${postdir}/frame_weights
 if [ $stage -le 1 ]; then
   $train_cmd JOB=1:$nj $frame_weights_dir/log/get_frame_weights.JOB.log \
     copy-post --prune-threshold=$prune_threshold "ark:gunzip -c $postdir/post.JOB.gz | post-to-pdf-post $postdir/final.mdl ark:- ark:- |" ark:- \| \
@@ -63,12 +63,12 @@ feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
 if [ $stage -le 2 ]; then
   # Train the DNN optimizing per-frame cross-entropy.
   # Train
-  local/utils/nnet/renew_nnet_softmax.sh $gmmdir/final.mdl $srcdir/final.nnet $dir/prepre_init.nnet > $dir/log/prepre_init.log
+  local/utils/nnet/renew_nnet_softmax.sh $postdir/final.mdl $srcdir/final.nnet $dir/prepre_init.nnet > $dir/log/prepre_init.log
   $train_cmd $dir/log/pre_init.log \
     nnet-copy --learning-rate-scales="0:0:0:0:0:0:1" $dir/prepre_init.nnet $dir/pre_init.nnet
-  cp $gmmdir/final.mdl $dir
-  cp $gmmdir/final.mat $dir
-  cp $gmmdir/tree $dir
+  cp $postdir/final.mdl $dir    
+  cp $gmmdir/final.mat $dir     # Feats match $gmmdir. Pdf match $postdir.
+  cp $postdir/tree $dir
 
   idx_list="{`seq -s',' $nj`}"
   $cuda_cmd $dir/log/train_nnet.log \
@@ -81,7 +81,6 @@ fi
 if [ $stage -le 3 ]; then
   steps/nnet/make_priors.sh --cmd "$train_cmd" --nj $train_nj $data_fmllr/$LANG/train $dir
 fi
-
 
 if [ $stage -le 4 ]; then
   test_id=`basename $test_dir`

@@ -29,11 +29,12 @@ use_soft_counts=true    # Use soft-counts as targets for unlabeled data
 acwt=0.2
 parallel_opts="--num-threads 6"
 
-gmmdir=exp/tri3b                    # SAT GMM to get fMLLR transforms for unlabeled data
+gmmdir=exp/tri3b_pt_$LANG           # SAT GMM to get fMLLR transforms for all data
+alidir=exp/tri3b                    # Directory to get supervised alignments
 data_fmllr=data-fmllr-tri3b         # Directory to store fMLLR feats of unlabeled data
-graph_dir=exp/tri3b/$LANG/graph_text_G    # Graph directory used while decoding unlabeled data and dev data
+graph_dir=exp/tri3b/$LANG/graph_text_G    # Graph directory used while decoding unlabeled data and dev data. Must probably match the alidir.
 feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform   # DBN feature transform used with the seed DBN
-dbn=exp/dnn4_pretrain-dbn/6.dbn     # Seed DBN used to initialize semi-supervised DNN
+dbn=exp/dnn4_pretrain-dbn/6.dbn     # Seed DBN used to initialize semi-supervised DNN. Must be trained on $gmmdir fMLLR features
 dnndir=exp/dnn4_pretrain-dbn_dnn    # Seed DNN used for decoding the unlabeled data
 
 # End of config.
@@ -65,7 +66,7 @@ if [ $stage -le -3 ]; then
   steps/compute_cmvn_stats.sh data/$L/unsup_4k exp/$L/make_mfcc/unsup_4k $mfccdir || exit 1
 fi
 
-# Decode unlabeled data using GMM
+# Decode unlabeled data using GMM to get the fMLLR transforms
 graph_affix=${graph_dir#*graph}
 if [ $stage -le -2 ]; then
   steps/decode_fmllr.sh $parallel_opts --nj $train_nj --cmd "$decode_cmd" \
@@ -103,16 +104,16 @@ fi
 # Converted alignments of the labeled (DT) data from all seen languages into 
 # one-hot posteriors and frame weights
 if [ $stage -le 2 ]; then
-  nj=$(cat $gmmdir/num_jobs)
+  nj=$(cat $alidir/num_jobs)
   $train_cmd JOB=1:$nj $postdir/get_train_post.JOB.log \
-    ali-to-pdf $gmmdir/final.mdl "ark:gunzip -c $gmmdir/ali.JOB.gz |" ark:- \| \
+    ali-to-pdf $alidir/final.mdl "ark:gunzip -c $alidir/ali.JOB.gz |" ark:- \| \
     ali-to-post ark:- ark,scp:$postdir/train_post.JOB.ark,$postdir/train_post.JOB.scp || exit 1
   for n in `seq $nj`; do 
     cat $postdir/train_post.$n.scp
   done > $postdir/train_post.scp
 
   for n in `seq $nj`; do
-    copy-int-vector "ark:gunzip -c $gmmdir/ali.$n.gz |" ark,t:- 
+    copy-int-vector "ark:gunzip -c $alidir/ali.$n.gz |" ark,t:- 
   done | \
     awk '{printf $1" ["; for (i=2; i<=NF; i++) { printf " "1; }; print " ]";}' | \
     copy-vector ark,t:- ark,scp:$postdir/train_frame_weights.ark,$postdir/train_frame_weights.scp || exit 1
@@ -181,13 +182,20 @@ if [ $stage -le 5 ]; then
   sort -k1,1 $postdir/unsup_post.scp $postdir/train_post_${num_copies}x.scp > $dir/all_post.scp
   sort -k1,1 $postdir/unsup_frame_weights.scp $postdir/train_frame_weights_${num_copies}x.scp > $dir/all_frame_weights.scp
 
-  num_tgt=$(hmm-info --print-args=false $gmmdir/final.mdl | grep pdfs | awk '{ print $NF }')
+  num_tgt=$(hmm-info --print-args=false $alidir/final.mdl | grep pdfs | awk '{ print $NF }')
   $cuda_cmd $dir/log/train.log \
     steps/nnet/train.sh --feature-transform $feature_transform --dbn $dbn \
     --hid-layers 0 --learn-rate 0.008 --num-tgt $num_tgt \
     --labels scp:$dir/all_post.scp --frame-weights scp:$dir/all_frame_weights.scp \
     $dir/data_semisup_4k_${num_copies}x $data_fmllr/train_cv10_0 \
     data/$L/lang dummy dummy $dir || exit 1;
+fi
+
+if [ ! -d $data_fmllr/train ]; then
+  featdir=$data_fmllr/train
+  steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
+    --transform-dir $gmmdir \
+    $featdir data/train $gmmdir $featdir/log $featdir/data  || exit 1
 fi
 
 # Get posteriors for the trained semi-supervised DNN
