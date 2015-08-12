@@ -31,14 +31,16 @@ feats_nj=10
 train_nj=10
 decode_nj=5
 
+dir=${srcdir}_${LANG}_pt_${prune_threshold}
+
 . utils/parse_options.sh 
 
 if [ $stage -le 0 ]; then
-  dir=$data_fmllr/$LANG/train
+  data_dir=$data_fmllr/$LANG/train
   steps/nnet/make_fmllr_feats.sh --nj $feats_nj --cmd "$train_cmd" \
     --transform-dir $gmmdir \
-    $dir data/$LANG/train $gmmdir $dir/log $dir/data || exit 1
-  utils/subset_data_dir_tr_cv.sh $dir ${dir}_tr90 ${dir}_cv10 || exit 1
+    $data_dir data/$LANG/train $gmmdir $data_dir/log $data_dir/data || exit 1
+  utils/subset_data_dir_tr_cv.sh $data_dir ${data_dir}_tr90 ${data_dir}_cv10 || exit 1
 fi
 
 nj=$(cat $postdir/num_jobs) || exit 1
@@ -55,13 +57,15 @@ if [ $stage -le 1 ]; then
   done > $frame_weights_dir/frame_weights.scp
 fi
 
-dir=${srcdir}_${LANG}_pt_${prune_threshold}
+mkdir -p $dir/log
+
 feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
 if [ $stage -le 2 ]; then
   # Train the DNN optimizing per-frame cross-entropy.
   # Train
+  local/utils/nnet/renew_nnet_softmax.sh $gmmdir/final.mdl $srcdir/final.nnet $dir/prepre_init.nnet > $dir/log/prepre_init.log
   $train_cmd $dir/log/pre_init.log \
-    nnet-copy --learning-rate-scales="0:0:0:0:0:0:1" $srcdir/final.nnet $dir/pre_init.nnet
+    nnet-copy --learning-rate-scales="0:0:0:0:0:0:1" $dir/prepre_init.nnet $dir/pre_init.nnet
   cp $gmmdir/final.mdl $dir
   cp $gmmdir/final.mat $dir
   cp $gmmdir/tree $dir

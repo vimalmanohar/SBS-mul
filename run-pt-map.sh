@@ -34,6 +34,10 @@ decode_nj=4
 
 parallel_opts="--num-threads 6"
 
+# Output directories
+alidir=exp/tri3b_ali_${LANG}_pt
+exp_dir=exp/tri3b_map_${LANG}_pt
+
 . utils/parse_options.sh
 
 if [ $# -ne 0 ]; then
@@ -80,10 +84,8 @@ if [ $stage -le 2 ]; then
 
   mkdir -p exp/tri3b_ali_${LANG}_pt
   local/align_fmllr_pt.sh --nj "$train_nj" --cmd "$train_cmd" data/$LANG/train \
-    data/lang exp/tri3b exp/tri3b_ali_${LANG}_pt $dir_fsts
+    data/lang exp/tri3b $alidir $dir_fsts
 fi
-
-exp_dir=exp/tri3b_map_${LANG}_pt
 
 if [ $stage -le 3 ]; then
   echo "Adapting to PTs"

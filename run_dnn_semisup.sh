@@ -44,7 +44,7 @@ set -u
 
 . utils/parse_options.sh
 
-dir=${dnndir}_semisup${num_copies}x${threshold:+_thres$threshold}
+dir=$(echo $dnndir | sed 's/dnn4/dnn5/g')_semisup${num_copies}x${threshold:+_thres$threshold}
 
 L=$LANG
 
