@@ -26,6 +26,7 @@ stage=0 # resume training with --stage=N
 
 prune_threshold=0.7
 threshold=0.7
+other_lr=1
 
 feats_nj=10
 train_nj=10
@@ -33,7 +34,7 @@ decode_nj=5
 
 reinit_softmax=true
 
-dir=${srcdir}_${LANG}_pt_${prune_threshold}
+dir=${srcdir}_${LANG}_pt_${prune_threshold}_ot${other_lr}
 
 . utils/parse_options.sh 
 
@@ -71,7 +72,7 @@ if [ $stage -le 2 ]; then
     cp $srcdir/final.nnet $dir/prepre_init.nnet
   fi
   $train_cmd $dir/log/pre_init.log \
-    nnet-copy --learning-rate-scales="0:0:0:0:0:0:1" $dir/prepre_init.nnet $dir/pre_init.nnet
+    nnet-copy --learning-rate-scales="$other_lr:$other_lr:$other_lr:$other_lr:$other_lr:$other_lr:1" $dir/prepre_init.nnet $dir/pre_init.nnet
   cp $postdir/final.mdl $dir    
   cp $gmmdir/final.mat $dir     # Feats match $gmmdir. Pdf match $postdir.
   cp $postdir/tree $dir

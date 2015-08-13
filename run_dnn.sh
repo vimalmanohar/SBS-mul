@@ -33,6 +33,8 @@ SBS_LANG="AR CA DT HG MD SW UR"
 # Config:
 gmmdir=exp/tri3b
 data_fmllr=data-fmllr-tri3b
+dbndir=exp/dnn4_pretrain-dbn
+dnndir=exp/dnn4_pretrain-dbn_dnn
 stage=0 # resume training with --stage=N
 # End of config.
 
@@ -67,19 +69,19 @@ fi
 
 if [ $stage -le 1 ]; then
   # Pre-train DBN, i.e. a stack of RBMs (small database, smaller DNN)
-  dir=exp/dnn4_pretrain-dbn
   # (tail --pid=$$ -F $dir/log/pretrain_dbn.log 2>/dev/null)& # forward log
 
+  dir=$dbndir
   $cuda_cmd $dir/log/pretrain_dbn.log \
     steps/nnet/pretrain_dbn.sh --hid-dim 1024 --rbm-iter 20 $data_fmllr/train $dir
 fi
 
 if [ $stage -le 2 ]; then
   # Train the DNN optimizing per-frame cross-entropy.
-  dir=exp/dnn4_pretrain-dbn_dnn
+  dir=$dnndir
   ali=${gmmdir}_ali
   feature_transform=exp/dnn4_pretrain-dbn/final.feature_transform
-  dbn=exp/dnn4_pretrain-dbn/6.dbn
+  dbn=$dbndir/6.dbn
   # (tail --pid=$$ -F $dir/log/train_nnet.log 2>/dev/null)& # forward log
 
   # Train
