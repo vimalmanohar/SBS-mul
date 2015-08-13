@@ -20,10 +20,12 @@ SBS_DATA_LISTS=/export/ws15-pt-data/data/lists
 # Set the language codes for SBS languages that we will be processing
 #export SBS_LANGUAGES="AR DT MD HG SW UR"
 #export TRAIN_LANG="SW AR UR DT HG"
-#export TEST_LANG="MD"
+export TEST_LANG="MD"
 #export TEST_LANG="SW"
 
 stage=0
+. utils/parse_options.sh
+
 #---------------------------------------------------------------------------
 # generate alignment for training data if needed, e.g., to train a dnn
 if [ $stage -le -1 ]; then
@@ -153,7 +155,7 @@ for L in $TEST_LANG; do
     dataset=dev
     #dataset=eval
     #steps/decode_fmllr.sh --nj "$decode_nj" --max_active 20000 --lattice_beam 4.0 $graph_dir \
-    steps/decode_fmllr.sh --nj "$decode_nj" --cmd "$decode_cmd" $graph_dir \
+    steps/decode_fmllr.sh --scoring-opts "--min-lmwt 1 --max-lmwt 15" --stage 200 --nj "$decode_nj" --cmd "$decode_cmd" $graph_dir \
       data/$dataset $exp_dir/decode_$dataset || exit 1;
     echo ------------------------------------------
 

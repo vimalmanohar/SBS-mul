@@ -26,6 +26,7 @@ stage=0 # resume training with --stage=N
 
 prune_threshold=0.7
 threshold=0.7
+acwt=0.2
 other_lr=1
 
 feats_nj=10
@@ -100,6 +101,6 @@ if [ $stage -le 5 ]; then
   # Decode (reuse HCLG graph)
   graph_id=${graph_dir#*graph}
   test_id=`basename $test_dir`
-  steps/nnet/decode.sh --nj $decode_nj --cmd "$decode_cmd" --acwt 0.2 \
-    $graph_dir $data_fmllr/${test_id}_$LANG $dir/decode${graph_id}_${test_id}_$LANG || exit 1
+  steps/nnet/decode.sh --nj $decode_nj --cmd "$decode_cmd" --acwt $acwt \
+    $graph_dir $data_fmllr/${test_id}_$LANG $dir/decode${graph_id}_acwt${acwt}_${test_id}_$LANG || exit 1
 fi
